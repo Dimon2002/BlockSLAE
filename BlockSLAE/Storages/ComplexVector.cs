@@ -8,8 +8,8 @@ public class ComplexVector
     public int Length => Values.Length;
 
     public double Norm
-        //=> double.Sqrt(ScalarProduct(this, this).Real);
-        => double.Sqrt(DomnikovScalarProduct(this, this));
+        => double.Sqrt(ScalarProduct(this, this).Real);
+        //=> double.Sqrt(DomnikovScalarProduct(this, this));
 
     public ComplexVector(IEnumerable<double> values)
     {
@@ -26,11 +26,18 @@ public class ComplexVector
         return new ComplexVector(values);
     }
 
+    public static ComplexVector None => new ComplexVector([]);
+    
     public ComplexVector Clone()
     {
         return new ComplexVector(Values);
     }
 
+    public void Nullify()
+    {
+        Array.Clear(Values, 0, Values.Length);
+    }
+    
     public ComplexVector MultiplyOn(Complex complexScalar)
     {
         var resultMemory = Clone();

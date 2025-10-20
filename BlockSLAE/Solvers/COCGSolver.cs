@@ -1,5 +1,6 @@
 ﻿using BlockSLAE.Preconditions;
 using BlockSLAE.Storages;
+using BlockSLAE.Storages.Structures;
 using Microsoft.Extensions.Logging;
 
 namespace BlockSLAE.Solvers;
@@ -9,7 +10,7 @@ public class COCGSolver : Method<COCGConfig>
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
 
     private ComplexDiagonalPreconditioner _preconditioner = null!;
-    private ComplexEquation<BlockMatrix> _equation = null!;
+    private ComplexEquation _equation = null!;
 
     private double _r0Norm;
 
@@ -30,14 +31,14 @@ public class COCGSolver : Method<COCGConfig>
         _preconditionerFactory = factory;
     }
 
-    public ComplexVector Solve(ComplexEquation<BlockMatrix> equation)
+    public ComplexVector Solve(ComplexEquation equation)
     {
         InitializeStartValues(equation);
 
         return IterationProcess();
     }
 
-    private void InitializeStartValues(ComplexEquation<BlockMatrix> equation)
+    private void InitializeStartValues(ComplexEquation equation)
     {
         _preconditioner = _preconditionerFactory.CreatePreconditioner(equation.Matrix);
         _equation = equation;
@@ -86,7 +87,3 @@ public class COCGSolver : Method<COCGConfig>
         return solution;
     }
 }
-
-public readonly record struct COCGConfig(int MaxIterations, double Epsilon);
-
-public record ComplexEquation<TMatrix>(TMatrix Matrix, ComplexVector Solution, ComplexVector RightSide);

@@ -23,5 +23,4 @@ public readonly struct ComplexValue
     
     public double Real => _values[0];
     public double Imaginary => _values.Length == 2 ? _values[1] : 0d;
-    
 }

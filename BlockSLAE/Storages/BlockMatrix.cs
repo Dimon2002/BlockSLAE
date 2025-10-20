@@ -17,15 +17,23 @@ public class BlockMatrix
     public int Size => DiagonalIndexes.Length - 1;
 
     public ReadOnlySpan<double> this[int i, int j] => GetBlockData(i, j);
+
+    public static BlockMatrix None => new BlockMatrix([], [], [], [], [], []);
     
-    public BlockMatrix(double[] di, double[] gg, int[] idi, int[] ijg, int[] ig, int[] jg)
+    public BlockMatrix(
+        IEnumerable<double> di, 
+        IEnumerable<double> gg, 
+        IEnumerable<int> idi, 
+        IEnumerable<int> ijg,
+        IEnumerable<int> ig,
+        IEnumerable<int> jg)
     {
-        Diagonal = di;
-        Values = gg;
-        DiagonalIndexes = idi;
-        OffDiagonalIndexes = ijg;
-        RowIndex = ig;
-        ColumnIndex = jg;
+        Diagonal = di.ToArray();
+        Values = gg.ToArray();
+        DiagonalIndexes = idi.ToArray();
+        OffDiagonalIndexes = ijg.ToArray();
+        RowIndex = ig.ToArray();
+        ColumnIndex = jg.ToArray();
     }
 
     public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
@@ -40,6 +48,11 @@ public class BlockMatrix
     
     private ComplexVector BlockMatrixMultiply(ComplexVector vector, ComplexVector resultMemory)
     {
+        if (Size == -1)
+        {
+            return ComplexVector.None;
+        }
+        
         var systemSize = vector.Length / 2;
 
         var x = vector.Values;
