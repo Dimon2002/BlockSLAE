@@ -20,8 +20,8 @@ var logger = LoggerFactory.Create(builder =>
     builder
         .AddConsole()
         .SetMinimumLevel(LogLevel.Information);
-}).CreateLogger<COCGSolver>();
+}).CreateLogger<ComplexLocalOptimalScheme>();
 
-var solver = new COCGSolver(new ComplexDiagonalPreconditionerFactory(), logger, config);
+var solver = new ComplexLocalOptimalScheme(new ComplexDiagonalPreconditionerFactory(), logger, config);
 
 _ = solver.Solve(equation);

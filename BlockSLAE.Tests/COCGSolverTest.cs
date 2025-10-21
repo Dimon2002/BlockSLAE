@@ -10,7 +10,7 @@ namespace BlockSLAE.Tests
     [TestFixture]
     public class COCGSolverTests
     {
-        private readonly double Tolerance = 1e-10;
+        private const double Tolerance = 1e-10;
         private ComplexDiagonalPreconditionerFactory _preconditionerFactory = null!;
         private SLAEConfig _config;
 
@@ -98,8 +98,6 @@ namespace BlockSLAE.Tests
             [
                 1, 0, 1, 1, 13, 6
             ];
-
-            //Assert.AreEqual(expected.Length, result.Length, "Expected and result length mismatch");
 
             Assert.That(result, Is.EqualTo(expected).Within(Tolerance));
         }
