@@ -3,6 +3,7 @@
 using BlockSLAE.IO;
 using BlockSLAE.Preconditions;
 using BlockSLAE.Solvers;
+using BlockSLAE.Storages;
 using BlockSLAE.Storages.Structures;
 using Microsoft.Extensions.Logging;
 
@@ -11,19 +12,16 @@ const int slaeNumber = 1;
 
 var pathCombined = Path.Combine(basePath, slaeNumber.ToString());
 
-var equation = ComplexEquationBuilder.Build(pathCombined, new BinaryFileHelper());
-var factory = new ComplexDiagonalPreconditionerFactory();
-var config = new COCGConfig(30_000, 1.000000e-005);
+var equation = ComplexEquationBuilder.BuildEquation(pathCombined, new BinaryFileHelper());
+var config = ComplexEquationBuilder.ReadSLAEConfig(pathCombined);
 
-using var loggerFactory = LoggerFactory.Create(builder =>
+var logger = LoggerFactory.Create(builder =>
 {
     builder
         .AddConsole()
         .SetMinimumLevel(LogLevel.Information);
-});
+}).CreateLogger<COCGSolver>();
 
-var logger = loggerFactory.CreateLogger<COCGSolver>();
-
-var solver = new COCGSolver(factory, logger, config);
+var solver = new COCGSolver(new ComplexDiagonalPreconditionerFactory(), logger, config);
 
 _ = solver.Solve(equation);

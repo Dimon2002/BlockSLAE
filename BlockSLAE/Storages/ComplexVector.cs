@@ -1,15 +1,16 @@
-﻿using System.Numerics;
+﻿using System.Collections;
+using System.Numerics;
 
 namespace BlockSLAE.Storages;
 
-public class ComplexVector
+public class ComplexVector : IEnumerable<double>
 {
     public double[] Values { get; }
     public int Length => Values.Length;
 
     public double Norm
         => double.Sqrt(ScalarProduct(this, this).Real);
-        //=> double.Sqrt(DomnikovScalarProduct(this, this));
+    //=> double.Sqrt(DomnikovScalarProduct(this, this));
 
     public ComplexVector(IEnumerable<double> values)
     {
@@ -27,7 +28,7 @@ public class ComplexVector
     }
 
     public static ComplexVector None => new ComplexVector([]);
-    
+
     public ComplexVector Clone()
     {
         return new ComplexVector(Values);
@@ -37,7 +38,7 @@ public class ComplexVector
     {
         Array.Clear(Values, 0, Values.Length);
     }
-    
+
     public ComplexVector MultiplyOn(Complex complexScalar)
     {
         var resultMemory = Clone();
@@ -100,14 +101,14 @@ public class ComplexVector
 
     private static ComplexVector Conjugate(ComplexVector vector)
     {
-        var values = vector.Values;
+        var valuesCopy = vector.Clone().Values;
 
-        for (var i = 1; i < vector.Length; i += 2)
+        for (var i = 1; i < valuesCopy.Length; i += 2)
         {
-            values[i] = -vector.Values[i];
+            valuesCopy[i] = -valuesCopy[i];
         }
 
-        return new ComplexVector(values);
+        return new ComplexVector(valuesCopy);
     }
 
     private static Complex ScalarProduct(ComplexVector a, ComplexVector b) // 2
@@ -138,7 +139,7 @@ public class ComplexVector
     {
         return ScalarProduct(Conjugate(a), b);
     }
-    
+
     private static double DomnikovScalarProduct(ComplexVector a, ComplexVector b) // 4
     {
         if (a.Length % 2 != 0 || b.Length % 2 != 0)
@@ -158,5 +159,15 @@ public class ComplexVector
         }
 
         return sum;
+    }
+
+    public IEnumerator<double> GetEnumerator()
+    {
+        return ((IEnumerable<double>)Values).GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
     }
 }

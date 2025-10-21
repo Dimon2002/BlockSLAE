@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlockSLAE.Solvers;
 
-public class COCGSolver : Method<COCGConfig>
+public class COCGSolver : Method<SLAEConfig>
 {
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
 
@@ -25,7 +25,7 @@ public class COCGSolver : Method<COCGConfig>
     public COCGSolver(
         ComplexDiagonalPreconditionerFactory factory,
         ILogger<COCGSolver> logger,
-        COCGConfig config
+        SLAEConfig config
     ) : base(config, logger)
     {
         _preconditionerFactory = factory;
@@ -55,7 +55,8 @@ public class COCGSolver : Method<COCGConfig>
         var solution = _equation.Solution;
         var fNorm = _equation.RightSide.Norm;
 
-        for (var i = 1; i < Config.MaxIterations && _r.Norm / fNorm >= Config.Epsilon; i++)
+        var i = 1;
+        for (; i < Config.MaxIterations && _r.Norm / fNorm >= Config.Epsilon; i++)
         {
             var matrixByP = _equation.Matrix.MultiplyOn(_p);
 
@@ -74,15 +75,15 @@ public class COCGSolver : Method<COCGConfig>
 
             if (i % 200 == 0)
             {
-                Logger.LogInformation("[{Iteration}] {relativeDiscrepancy:E15} / {Config.Discrepancy}", i, _r.Norm / fNorm, Config.Epsilon);
-                Console.WriteLine($"Iteration: {i} {_r.Norm / fNorm:E15} / {Config.Epsilon:E15}");
+                Logger.LogInformation("[{Iteration}] {relativeDiscrepancy:E15} / {Config.Discrepancy:E15}", i, _r.Norm / fNorm, Config.Epsilon);
+                Console.WriteLine($"[{nameof(COCGSolver)}:{i}] {_r.Norm / fNorm:E15} / {Config.Epsilon:E15}");
             }
         }
 
         var discrepancy = (_equation.RightSide - _equation.Matrix.MultiplyOn(solution)).Norm / _r0Norm;
         
-        Logger.LogInformation("Discrepancy: {discrepancy:E8}", discrepancy);
-        Console.WriteLine($"Discrepancy: {discrepancy:E8}");
+        Logger.LogInformation("EndIteration {i} Discrepancy: {discrepancy:E8}", i, discrepancy);
+        Console.WriteLine($"[{nameof(COCGSolver)}:{i}] Discrepancy: {discrepancy:E8}");
 
         return solution;
     }
