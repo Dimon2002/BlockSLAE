@@ -31,6 +31,17 @@ public class ComplexVector : IEnumerable<double>
     {
         return new ComplexVector(Values);
     }
+    
+    public void CopyFrom(ComplexVector other)
+    {
+        if (other.Length != Length)
+        {
+            throw new ArgumentException("Vectors must have the same length");
+        }
+
+        Array.Copy(other.Values, Values, Length);
+    }
+
 
     public void Nullify()
     {

@@ -1,4 +1,5 @@
 ﻿using BlockSLAE.Preconditions;
+using BlockSLAE.Smoothing;
 using BlockSLAE.Storages;
 using BlockSLAE.Storages.Structures;
 using Microsoft.Extensions.Logging;
@@ -8,6 +9,7 @@ namespace BlockSLAE.Solvers;
 public class COCGSolver : Method<SLAEConfig>, ISLAESolver
 {
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
+    private readonly ISmoothingStrategy _smoothingStrategy;
 
     private ComplexDiagonalPreconditioner _preconditioner = null!;
     private ComplexEquation _equation = null!;
@@ -24,11 +26,13 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
 
     public COCGSolver(
         ComplexDiagonalPreconditionerFactory factory,
+        ISmoothingStrategy strategy,
         ILogger<COCGSolver> logger,
         SLAEConfig config
     ) : base(config, logger)
     {
         _preconditionerFactory = factory;
+        _smoothingStrategy = strategy;
     }
 
     public ComplexVector Solve(ComplexEquation equation)
@@ -57,6 +61,8 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
         _p = _z.Clone();
 
         _r0Norm = _r.Norm;
+        
+        _smoothingStrategy.Initialize(_equation.Solution, _r);
     }
 
     private ComplexVector IterationProcess()
@@ -81,6 +87,10 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
             var b = _rNext.PseudoScalarProduct(_zNext) / _r.PseudoScalarProduct(_z);
             _zNext.Add(_p.MultiplyOn(b, buffer), _pNext);
 
+            _smoothingStrategy.Apply(solution, _rNext, _equation.Matrix);
+            solution.CopyFrom(_smoothingStrategy.SmoothingSolution);
+            _rNext.CopyFrom(_smoothingStrategy.SmoothingResidual);
+                
             (_r, _rNext) = (_rNext, _r);
             (_z, _zNext) = (_zNext, _z);
             (_p, _pNext) = (_pNext, _p);
@@ -98,6 +108,6 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
         Logger.LogInformation("EndIteration {i} Discrepancy: {discrepancy:E8}", i, discrepancy);
         Console.WriteLine($"[{nameof(COCGSolver)}:{i}] Discrepancy: {discrepancy:E8}");
 
-        return solution;
+        return _equation.Solution;
     }
 }

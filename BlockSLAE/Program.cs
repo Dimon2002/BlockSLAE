@@ -2,6 +2,7 @@
 
 using BlockSLAE.IO;
 using BlockSLAE.Preconditions;
+using BlockSLAE.Smoothing;
 using BlockSLAE.Solvers;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +21,8 @@ var logger = LoggerFactory.Create(builder =>
         .SetMinimumLevel(LogLevel.Information);
 }).CreateLogger<COCGSolver>();
 
-var solver = new COCGSolver(new ComplexDiagonalPreconditionerFactory(), logger, config);
+ISmoothingStrategy strategy = new LackSmoothing();
+
+var solver = new COCGSolver(new ComplexDiagonalPreconditionerFactory(), strategy, logger, config);
 
 _ = solver.Solve(equation);

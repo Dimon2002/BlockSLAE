@@ -1,4 +1,5 @@
 ﻿using BlockSLAE.Preconditions;
+using BlockSLAE.Smoothing;
 using BlockSLAE.Solvers;
 using BlockSLAE.Storages;
 using BlockSLAE.Storages.Structures;
@@ -12,6 +13,7 @@ public class ComplexLocalOptimalSchemeTest
 {
     private const double Tolerance = 1e-10;
     private ComplexDiagonalPreconditionerFactory _preconditionerFactory = null!;
+    private ISmoothingStrategy _strategy = null!;
     private SLAEConfig _config;
 
     [SetUp]
@@ -23,6 +25,8 @@ public class ComplexLocalOptimalSchemeTest
             MaxIterations = 1_000,
             Epsilon = 1e-10
         };
+        
+        _strategy = new LackSmoothing();
     }
 
     [Test(Description = """
@@ -48,6 +52,7 @@ public class ComplexLocalOptimalSchemeTest
 
         var solver = new ComplexLocalOptimalScheme(
             _preconditionerFactory,
+            _strategy,
             new NullLogger<ComplexLocalOptimalScheme>(),
             _config);
 
@@ -89,6 +94,7 @@ public class ComplexLocalOptimalSchemeTest
 
         var solver = new ComplexLocalOptimalScheme(
             _preconditionerFactory,
+            _strategy,
             new NullLogger<ComplexLocalOptimalScheme>(),
             _config);
 

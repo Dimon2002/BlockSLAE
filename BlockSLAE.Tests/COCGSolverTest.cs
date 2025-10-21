@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using BlockSLAE.Storages;
 using BlockSLAE.Solvers;
 using BlockSLAE.Preconditions;
+using BlockSLAE.Smoothing;
 using BlockSLAE.Storages.Structures;
 
 namespace BlockSLAE.Tests
@@ -12,6 +13,7 @@ namespace BlockSLAE.Tests
     {
         private const double Tolerance = 1e-10;
         private ComplexDiagonalPreconditionerFactory _preconditionerFactory = null!;
+        private ISmoothingStrategy _strategy = null!;
         private SLAEConfig _config;
 
         [SetUp]
@@ -23,6 +25,8 @@ namespace BlockSLAE.Tests
                 MaxIterations = 1_000,
                 Epsilon = 1e-10
             };
+
+            _strategy = new LackSmoothing();
         }
 
         [Test(Description = """
@@ -48,6 +52,7 @@ namespace BlockSLAE.Tests
 
             var solver = new COCGSolver(
                 _preconditionerFactory,
+                _strategy,
                 new NullLogger<COCGSolver>(),
                 _config);
 
@@ -89,6 +94,7 @@ namespace BlockSLAE.Tests
 
             var solver = new COCGSolver(
                 _preconditionerFactory,
+                _strategy,
                 new NullLogger<COCGSolver>(),
                 _config);
 
