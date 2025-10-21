@@ -2,13 +2,13 @@
 
 public class BlockMatrix
 {
-    public int[]  DiagonalIndexes { get; }
+    public int[] DiagonalIndexes { get; }
 
-    public int[]  RowIndex { get; }
+    public int[] RowIndex { get; }
 
-    public int[]  OffDiagonalIndexes { get; }
+    public int[] OffDiagonalIndexes { get; }
 
-    public int[]  ColumnIndex { get; }
+    public int[] ColumnIndex { get; }
 
     public double[] Diagonal { get; }
 
@@ -19,11 +19,11 @@ public class BlockMatrix
     public ReadOnlySpan<double> this[int i, int j] => GetBlockData(i, j);
 
     public static BlockMatrix None => new BlockMatrix([], [], [], [], [], []);
-    
+
     public BlockMatrix(
-        IEnumerable<double> di, 
-        IEnumerable<double> gg, 
-        IEnumerable<int> idi, 
+        IEnumerable<double> di,
+        IEnumerable<double> gg,
+        IEnumerable<int> idi,
         IEnumerable<int> ijg,
         IEnumerable<int> ig,
         IEnumerable<int> jg)
@@ -38,21 +38,24 @@ public class BlockMatrix
 
     public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
     {
-        return BlockMatrixMultiply(vector, resultMemory ?? ComplexVector.Create(vector.Length));
+        resultMemory ??= ComplexVector.Create(vector.Length);
+        resultMemory.Nullify();
+
+        return BlockMatrixMultiply(vector, resultMemory);
     }
 
     public BlockMatrix Clone()
     {
         return new BlockMatrix(Diagonal, Values, DiagonalIndexes, OffDiagonalIndexes, RowIndex, ColumnIndex);
     }
-    
+
     private ComplexVector BlockMatrixMultiply(ComplexVector vector, ComplexVector resultMemory)
     {
         if (Size == -1)
         {
             return ComplexVector.None;
         }
-        
+
         var systemSize = vector.Length / 2;
 
         var x = vector.Values;
@@ -93,7 +96,7 @@ public class BlockMatrix
             resultMemory[1] += a[1] * x[0];
         }
     }
-    
+
     private ReadOnlySpan<double> GetBlockData(int i, int j)
     {
         int currentBlockIndex;
@@ -112,12 +115,12 @@ public class BlockMatrix
 
         return Values.AsSpan(currentBlockIndex, length);
     }
-    
+
     private int GetDiagonalBlockSize(in int offset)
     {
         return DiagonalIndexes[offset + 1] - DiagonalIndexes[offset];
     }
-    
+
     private int GetOffDiagonalBlockSize(in int offset)
     {
         return OffDiagonalIndexes[offset + 1] - OffDiagonalIndexes[offset];

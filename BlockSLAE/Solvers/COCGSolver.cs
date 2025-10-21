@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlockSLAE.Solvers;
 
-public class COCGSolver : Method<SLAEConfig>
+public class COCGSolver : Method<SLAEConfig>, ISLAESolver
 {
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
 
@@ -42,11 +42,20 @@ public class COCGSolver : Method<SLAEConfig>
     {
         _preconditioner = _preconditionerFactory.CreatePreconditioner(equation.Matrix);
         _equation = equation;
-
-        _r = _equation.RightSide - _equation.Matrix.MultiplyOn(_equation.Solution);
-        _z = _preconditioner.MultiplyOn(_r);
-        _p = _z.Clone();
         
+        var dimension =  _equation.RightSide.Length;
+        
+        _r =  ComplexVector.Create(dimension);
+        _z =  ComplexVector.Create(dimension);
+        
+        _rNext = ComplexVector.Create(dimension);
+        _zNext = ComplexVector.Create(dimension);
+        _pNext = ComplexVector.Create(dimension);
+        
+        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(_equation.Solution), _r);
+        _preconditioner.MultiplyOn(_r, _z);
+        _p = _z.Clone();
+
         _r0Norm = _r.Norm;
     }
 
@@ -55,23 +64,26 @@ public class COCGSolver : Method<SLAEConfig>
         var solution = _equation.Solution;
         var fNorm = _equation.RightSide.Norm;
 
+        var matrixByP = ComplexVector.Create(_equation.RightSide.Length);
+        var buffer = ComplexVector.Create(_equation.RightSide.Length);
+
         var i = 1;
         for (; i < Config.MaxIterations && _r.Norm / fNorm >= Config.Epsilon; i++)
         {
-            var matrixByP = _equation.Matrix.MultiplyOn(_p);
+            _equation.Matrix.MultiplyOn(_p, matrixByP);
 
             var a = _r.PseudoScalarProduct(_z) / matrixByP.PseudoScalarProduct(_p);
-            solution += _p.MultiplyOn(a);
+            solution.Add(_p.MultiplyOn(a, buffer), solution);
 
-            _rNext = _r - matrixByP.MultiplyOn(a);
-            _zNext = _preconditioner.MultiplyOn(_rNext);
+            _r.Subtract(matrixByP.MultiplyOn(a, buffer), _rNext);
+            _preconditioner.MultiplyOn(_rNext, _zNext);
 
             var b = _rNext.PseudoScalarProduct(_zNext) / _r.PseudoScalarProduct(_z);
-            _pNext = _zNext + _p.MultiplyOn(b);
+            _zNext.Add(_p.MultiplyOn(b, buffer), _pNext);
 
-            _r = _rNext.Clone();
-            _z = _zNext.Clone();
-            _p = _pNext.Clone();
+            (_r, _rNext) = (_rNext, _r);
+            (_z, _zNext) = (_zNext, _z);
+            (_p, _pNext) = (_pNext, _p);
 
             if (i % 200 == 0)
             {
@@ -80,8 +92,9 @@ public class COCGSolver : Method<SLAEConfig>
             }
         }
 
-        var discrepancy = (_equation.RightSide - _equation.Matrix.MultiplyOn(solution)).Norm / _r0Norm;
-        
+        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer), buffer);
+        var discrepancy = buffer.Norm / _r0Norm;
+
         Logger.LogInformation("EndIteration {i} Discrepancy: {discrepancy:E8}", i, discrepancy);
         Console.WriteLine($"[{nameof(COCGSolver)}:{i}] Discrepancy: {discrepancy:E8}");
 

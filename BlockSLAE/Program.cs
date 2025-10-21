@@ -3,8 +3,6 @@
 using BlockSLAE.IO;
 using BlockSLAE.Preconditions;
 using BlockSLAE.Solvers;
-using BlockSLAE.Storages;
-using BlockSLAE.Storages.Structures;
 using Microsoft.Extensions.Logging;
 
 const string basePath = @"E:\Projects\BlockSLAE\Input\";
@@ -20,8 +18,8 @@ var logger = LoggerFactory.Create(builder =>
     builder
         .AddConsole()
         .SetMinimumLevel(LogLevel.Information);
-}).CreateLogger<ComplexLocalOptimalScheme>();
+}).CreateLogger<COCGSolver>();
 
-var solver = new ComplexLocalOptimalScheme(new ComplexDiagonalPreconditionerFactory(), logger, config);
+var solver = new COCGSolver(new ComplexDiagonalPreconditionerFactory(), logger, config);
 
 _ = solver.Solve(equation);

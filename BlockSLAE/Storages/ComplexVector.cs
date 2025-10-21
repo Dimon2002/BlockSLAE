@@ -8,9 +8,7 @@ public class ComplexVector : IEnumerable<double>
     public double[] Values { get; }
     public int Length => Values.Length;
 
-    public double Norm
-        => double.Sqrt(ScalarProduct(this, this).Real);
-    //=> double.Sqrt(DomnikovScalarProduct(this, this));
+    public double Norm => double.Sqrt(ScalarProduct(this, this).Real);
 
     public ComplexVector(IEnumerable<double> values)
     {
@@ -36,12 +34,35 @@ public class ComplexVector : IEnumerable<double>
 
     public void Nullify()
     {
-        Array.Clear(Values, 0, Values.Length);
+        Array.Fill(Values, 0);
     }
 
-    public ComplexVector MultiplyOn(Complex complexScalar)
+    public void Add(ComplexVector other, ComplexVector? resultMemory = null)
     {
-        var resultMemory = Clone();
+        LinearCombination(1, 1, other, resultMemory ?? Create(other.Length));
+    }
+
+    public void Subtract(ComplexVector other, ComplexVector? resultMemory = null)
+    {
+        LinearCombination(1, -1, other, resultMemory ?? Create(other.Length));
+    }
+    
+    private void LinearCombination(int a, int b, ComplexVector other, ComplexVector resultMemory)
+    {
+        if (Length != other.Length)
+        {
+            throw new ArgumentException("Vectors must have the same length");
+        }
+
+        for (var i = 0; i < Length; i++)
+        {
+            resultMemory.Values[i] = a * Values[i] + b * other.Values[i];
+        }
+    }
+
+    public ComplexVector MultiplyOn(Complex complexScalar, ComplexVector? resultMemory = null)
+    {
+        resultMemory ??= Clone();
 
         for (var i = 0; i < Length / 2; i++)
         {
@@ -64,51 +85,17 @@ public class ComplexVector : IEnumerable<double>
     {
         return PseudoScalarProduct(this, outerVector);
     }
-
-    public static ComplexVector operator +(ComplexVector vectorLeft, ComplexVector vectorRight)
-    {
-        if (vectorLeft.Length != vectorRight.Length)
-        {
-            throw new ArgumentException("Vectors must have the same length");
-        }
-
-        var resultMemory = Create(vectorLeft.Length);
-
-        for (var i = 0; i < vectorLeft.Length; i++)
-        {
-            resultMemory.Values[i] = vectorLeft.Values[i] + vectorRight.Values[i];
-        }
-
-        return resultMemory;
-    }
-
-    public static ComplexVector operator -(ComplexVector vectorLeft, ComplexVector vectorRight)
-    {
-        if (vectorLeft.Length != vectorRight.Length)
-        {
-            throw new ArgumentException("Vectors must have the same length");
-        }
-
-        var resultMemory = Create(vectorLeft.Length);
-
-        for (var i = 0; i < vectorLeft.Length; i++)
-        {
-            resultMemory.Values[i] = vectorLeft.Values[i] - vectorRight.Values[i];
-        }
-
-        return resultMemory;
-    }
-
+    
     private static ComplexVector Conjugate(ComplexVector vector)
     {
-        var valuesCopy = vector.Clone().Values;
+        var conjugatedVector = vector.Clone();
 
-        for (var i = 1; i < valuesCopy.Length; i += 2)
+        for (var i = 1; i < conjugatedVector.Length; i += 2)
         {
-            valuesCopy[i] = -valuesCopy[i];
+            conjugatedVector.Values[i] = -conjugatedVector.Values[i];
         }
 
-        return new ComplexVector(valuesCopy);
+        return new ComplexVector(conjugatedVector);
     }
 
     private static Complex ScalarProduct(ComplexVector a, ComplexVector b) // 2
@@ -140,34 +127,7 @@ public class ComplexVector : IEnumerable<double>
         return ScalarProduct(Conjugate(a), b);
     }
 
-    private static double DomnikovScalarProduct(ComplexVector a, ComplexVector b) // 4
-    {
-        if (a.Length % 2 != 0 || b.Length % 2 != 0)
-        {
-            throw new ArgumentException("Vector and result must have an even length");
-        }
+    public IEnumerator<double> GetEnumerator() => ((IEnumerable<double>)Values).GetEnumerator();
 
-        if (a.Length != b.Length)
-        {
-            throw new ArgumentException("Vector and result must have same length");
-        }
-
-        var sum = 0d;
-        for (var i = 0; i < a.Length / 2; i++)
-        {
-            sum += a.Values[2 * i] * b.Values[2 * i] + a.Values[2 * i + 1] * b.Values[2 * i + 1];
-        }
-
-        return sum;
-    }
-
-    public IEnumerator<double> GetEnumerator()
-    {
-        return ((IEnumerable<double>)Values).GetEnumerator();
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

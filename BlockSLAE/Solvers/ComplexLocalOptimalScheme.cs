@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlockSLAE.Solvers;
 
-public class ComplexLocalOptimalScheme : Method<SLAEConfig>
+public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
 {
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
 
@@ -42,12 +42,18 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>
         _preconditioner = _preconditionerFactory.CreatePreconditioner(equation.Matrix);
         _equation = equation;
         
-        _r = _equation.RightSide - _equation.Matrix.MultiplyOn(_equation.Solution);
-        _s = _preconditioner.MultiplyOn(_r);
+        var dimension = _equation.RightSide.Length;
+        _r = ComplexVector.Create(dimension);
+        _s = ComplexVector.Create(dimension);
+        _a = ComplexVector.Create(dimension);
+        _w = ComplexVector.Create(dimension);
+        
+        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(_equation.Solution), _r);
+        _preconditioner.MultiplyOn(_r, _s);
         _p = _s.Clone();
-        _a = _equation.Matrix.MultiplyOn(_p);
+        _equation.Matrix.MultiplyOn(_p, _a);
         _z = _a.Clone();
-        _w = _preconditioner.MultiplyOn(_z);
+        _preconditioner.MultiplyOn(_z, _w);
         
         _r0Norm = _r.Norm;
     }
@@ -57,21 +63,24 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>
         var solution = _equation.Solution;
         var fNorm = _equation.RightSide.Norm;
 
+        var buffer = ComplexVector.Create(_equation.RightSide.Length);
+
         var i = 1;
         for (; i < Config.MaxIterations && _r.Norm / fNorm >= Config.Epsilon; i++)
         {
             var alpha = _w.PseudoScalarProduct(_r) / _w.PseudoScalarProduct(_z);
-            
-            solution += _p.MultiplyOn(alpha);
-            _r -= _z.MultiplyOn(alpha);
-            _s -= _w.MultiplyOn(alpha);
-            _a = _equation.Matrix.MultiplyOn(_s);
+            solution.Add(_p.MultiplyOn(alpha, buffer), solution);
+
+            _r.Subtract(_z.MultiplyOn(alpha, buffer), _r);
+            _s.Subtract(_w.MultiplyOn(alpha, buffer), _s);
+            _equation.Matrix.MultiplyOn(_s, _a);
 
             var betta = -_w.PseudoScalarProduct(_a) / _w.PseudoScalarProduct(_z);
             
-            _p = _s + _p.MultiplyOn(betta);
-            _z = _a + _z.MultiplyOn(betta);
-            _w = _preconditioner.MultiplyOn(_z);
+            _s.Add(_p.MultiplyOn(betta, buffer), _p);
+            _a.Add(_z.MultiplyOn(betta, buffer), _z);
+            
+            _preconditioner.MultiplyOn(_z, _w);
             
             if (i % 200 == 0)
             {
@@ -79,8 +88,9 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>
                 Console.WriteLine($"[{nameof(ComplexLocalOptimalScheme)}:{i}] {_r.Norm / fNorm:E15} / {Config.Epsilon:E15}");
             }
         }
-        
-        var discrepancy = (_equation.RightSide - _equation.Matrix.MultiplyOn(solution)).Norm / _r0Norm;
+
+        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer), buffer);
+        var discrepancy = buffer.Norm / _r0Norm;
 
         Logger.LogInformation("EndIteration {i} Discrepancy: {discrepancy:E8}", i, discrepancy);
         Console.WriteLine($"[{nameof(ComplexLocalOptimalScheme)}:{i}] Discrepancy: {discrepancy:E8}");

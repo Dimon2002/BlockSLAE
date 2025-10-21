@@ -20,9 +20,11 @@ public class ComplexDiagonalPreconditioner
         );
     }
 
-    public ComplexVector MultiplyOn(ComplexVector vector)
+    public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
     {
-        return _decomposedMatrix.MultiplyOn(vector);
+        resultMemory ??= ComplexVector.Create(vector.Length);
+
+        return _decomposedMatrix.MultiplyOn(vector, resultMemory);
     }
 
     private static ComplexVector EvaluateInverseDiagonal(BlockMatrix matrix)
@@ -42,7 +44,7 @@ public class ComplexDiagonalPreconditioner
                 det += block[1] * block[1];
                 resultMemory.Values[offset + 1] = -block[1] / det;
             }
-            
+
             resultMemory.Values[offset] = block[0] / det;
             offset += length;
         }
