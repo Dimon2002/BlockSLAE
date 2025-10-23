@@ -26,7 +26,7 @@ namespace BlockSLAE.Tests
                 Epsilon = 1e-10
             };
 
-            _strategy = new LackSmoothing();
+            _strategy = new ResidualSmoothing();
         }
 
         [Test(Description = """

@@ -4,8 +4,8 @@ namespace BlockSLAE.Smoothing;
 
 public class LackSmoothing : ISmoothingStrategy
 {
-    private ComplexVector _x = null!;
-    private ComplexVector _r = null!;
+    private ComplexVector _x = ComplexVector.None;
+    private ComplexVector _r = ComplexVector.None;
 
     public void Initialize(ComplexVector startSolution, ComplexVector startResidual)
     {
@@ -20,5 +20,6 @@ public class LackSmoothing : ISmoothingStrategy
     }
 
     public ComplexVector SmoothingSolution => _x;
+    
     public ComplexVector SmoothingResidual => _r;
 }

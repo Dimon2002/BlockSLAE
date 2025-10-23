@@ -21,7 +21,7 @@ var logger = LoggerFactory.Create(builder =>
         .SetMinimumLevel(LogLevel.Information);
 }).CreateLogger<COCGSolver>();
 
-ISmoothingStrategy strategy = new LackSmoothing();
+ISmoothingStrategy strategy = new ResidualSmoothing();
 
 var solver = new COCGSolver(new ComplexDiagonalPreconditionerFactory(), strategy, logger, config);
 
