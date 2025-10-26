@@ -4,22 +4,17 @@ namespace BlockSLAE.Smoothing;
 
 public class LackSmoothing : ISmoothingStrategy
 {
-    private ComplexVector _x = ComplexVector.None;
-    private ComplexVector _r = ComplexVector.None;
+    public ComplexVector Solution { get; private set; } = ComplexVector.None;
+
+    public ComplexVector Residual { get; private set; } = ComplexVector.None;
 
     public void Initialize(ComplexVector startSolution, ComplexVector startResidual)
     {
-        _x = startSolution;
-        _r = startResidual;
+        Solution = startSolution;
+        Residual = startResidual;
     }
 
-    public void Apply(ComplexVector currentSolution, ComplexVector currentResidual, BlockMatrix matrix)
+    public void Apply(ComplexVector currentSolution, ComplexVector currentResidual)
     {
-        _x = currentSolution;
-        _r = currentResidual;
     }
-
-    public ComplexVector SmoothingSolution => _x;
-    
-    public ComplexVector SmoothingResidual => _r;
 }

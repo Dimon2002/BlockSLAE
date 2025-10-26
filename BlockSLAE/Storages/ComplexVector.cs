@@ -9,7 +9,7 @@ public class ComplexVector : IEnumerable<double>
     public int Length => Values.Length;
 
     public double Norm => double.Sqrt(ScalarProduct(this, this).Real);
-
+    
     public ComplexVector(IEnumerable<double> values)
     {
         Values = values.ToArray();
@@ -25,50 +25,26 @@ public class ComplexVector : IEnumerable<double>
         return new ComplexVector(values);
     }
 
-    public static ComplexVector None => new ComplexVector([]);
+    public static ComplexVector None => new([]);
 
     public ComplexVector Clone()
     {
         return new ComplexVector(Values);
     }
-    
+
     public void CopyFrom(ComplexVector other)
     {
         if (other.Length != Length)
         {
             throw new ArgumentException("Vectors must have the same length");
         }
-
+       
         Array.Copy(other.Values, Values, Length);
     }
 
-
     public void Nullify()
     {
-        Array.Fill(Values, 0);
-    }
-
-    public void Add(ComplexVector other, ComplexVector? resultMemory = null)
-    {
-        LinearCombination(1, 1, other, resultMemory ?? Create(other.Length));
-    }
-
-    public void Subtract(ComplexVector other, ComplexVector? resultMemory = null)
-    {
-        LinearCombination(1, -1, other, resultMemory ?? Create(other.Length));
-    }
-    
-    private void LinearCombination(int a, int b, ComplexVector other, ComplexVector resultMemory)
-    {
-        if (Length != other.Length)
-        {
-            throw new ArgumentException("Vectors must have the same length");
-        }
-
-        for (var i = 0; i < Length; i++)
-        {
-            resultMemory.Values[i] = a * Values[i] + b * other.Values[i];
-        }
+        Array.Clear(Values);
     }
 
     public ComplexVector MultiplyOn(Complex complexScalar, ComplexVector? resultMemory = null)
@@ -95,6 +71,24 @@ public class ComplexVector : IEnumerable<double>
     public Complex PseudoScalarProduct(ComplexVector outerVector)
     {
         return PseudoScalarProduct(this, outerVector);
+    }
+
+    public void Add(ComplexVector other, ComplexVector? resultMemory = null)
+    {
+        LinearCombination(1, 1, other, resultMemory ?? Create(other.Length));
+    }
+
+    public void Subtract(ComplexVector other, ComplexVector? resultMemory = null)
+    {
+        LinearCombination(1, -1, other, resultMemory ?? Create(other.Length));
+    }
+
+    private void LinearCombination(int a, int b, ComplexVector other, ComplexVector resultMemory)
+    {
+        for (var i = 0; i < Length; i++)
+        {
+            resultMemory.Values[i] = a * Values[i] + b * other.Values[i];
+        }
     }
     
     private static ComplexVector Conjugate(ComplexVector vector)

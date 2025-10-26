@@ -9,6 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="ChrisForte.Microsoft.Extensions.Logging.Files" Version="8.0.2" />
       <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0-rc.2.25502.107" />
       <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0-rc.2.25502.107" />
     </ItemGroup>
@@ -16,5 +17,4 @@
     <ItemGroup>
       <Folder Include="Input\" />
     </ItemGroup>
-
 </Project>

@@ -15,14 +15,14 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
     private ComplexEquation _equation = null!;
 
     private double _r0Norm;
-    
+
     private ComplexVector _r;
     private ComplexVector _p;
     private ComplexVector _s;
     private ComplexVector _z;
     private ComplexVector _a;
     private ComplexVector _w;
-    
+
     public ComplexLocalOptimalScheme(
         ComplexDiagonalPreconditionerFactory factory,
         ISmoothingStrategy strategy,
@@ -45,22 +45,22 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
     {
         _preconditioner = _preconditionerFactory.CreatePreconditioner(equation.Matrix);
         _equation = equation;
-        
+
         var dimension = _equation.RightSide.Length;
         _r = ComplexVector.Create(dimension);
         _s = ComplexVector.Create(dimension);
         _a = ComplexVector.Create(dimension);
         _w = ComplexVector.Create(dimension);
-        
+
         _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(_equation.Solution), _r);
         _preconditioner.MultiplyOn(_r, _s);
         _p = _s.Clone();
         _equation.Matrix.MultiplyOn(_p, _a);
         _z = _a.Clone();
         _preconditioner.MultiplyOn(_z, _w);
-        
+
         _r0Norm = _r.Norm;
-        
+
         _smoothingStrategy.Initialize(_equation.Solution, _r);
     }
 
@@ -71,6 +71,9 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
 
         var buffer = ComplexVector.Create(_equation.RightSide.Length);
 
+        Logger.LogInformation("{SolverName} started...\n\t\t\t\t\tOriginal \t  | \tSmoothed", nameof(ComplexLocalOptimalScheme));
+        Console.WriteLine($"{nameof(ComplexLocalOptimalScheme)} started...\n\t\t\t\t\tOriginal      | \t\tSmoothed");
+        
         var i = 1;
         for (; i < Config.MaxIterations && _r.Norm / fNorm >= Config.Epsilon; i++)
         {
@@ -82,29 +85,40 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
             _equation.Matrix.MultiplyOn(_s, _a);
 
             var betta = -_w.PseudoScalarProduct(_a) / _w.PseudoScalarProduct(_z);
-            
+
             _s.Add(_p.MultiplyOn(betta, buffer), _p);
             _a.Add(_z.MultiplyOn(betta, buffer), _z);
-            
+
             _preconditioner.MultiplyOn(_z, _w);
-            
-            _smoothingStrategy.Apply(solution, _r, _equation.Matrix);
-            solution.CopyFrom(_smoothingStrategy.SmoothingSolution);
-            _r.CopyFrom(_smoothingStrategy.SmoothingResidual);
-            
-            if (i % 200 == 0)
+
+            _smoothingStrategy.Apply(solution, _r);
+            if (_smoothingStrategy.Residual.Norm / fNorm < Config.Epsilon)
             {
-                Logger.LogInformation("[{Iteration}] {relativeDiscrepancy:E15} / {Config.Discrepancy}", i, _r.Norm / fNorm, Config.Epsilon);
-                Console.WriteLine($"[{nameof(ComplexLocalOptimalScheme)}:{i}] {_r.Norm / fNorm:E15} / {Config.Epsilon:E15}");
+                solution.CopyFrom(_smoothingStrategy.Solution);
+                _r.CopyFrom(_smoothingStrategy.Residual);
+
+                break;
+            }
+            
+            if (i % 50 == 0)
+            {
+                var relativeNorm = _r.Norm / fNorm;
+                var smoothedRelativeNorm = _smoothingStrategy.Residual.Norm / fNorm;
+                
+                Logger.LogInformation(
+                    "[{Iteration}]  {original:E15} | {smoothed:E15} / {Discrepancy:E15}",
+                    i, relativeNorm, smoothedRelativeNorm, Config.Epsilon);
+                Console.WriteLine(
+                    $"[{nameof(ComplexLocalOptimalScheme)}:{i}] {relativeNorm:E15} | {smoothedRelativeNorm:E15} / {Config.Epsilon:E15}");
             }
         }
 
         _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer), buffer);
         var discrepancy = buffer.Norm / _r0Norm;
 
-        Logger.LogInformation("EndIteration {i} Discrepancy: {discrepancy:E8}", i, discrepancy);
+        Logger.LogInformation("{Solver} finished. End Iteration {i} Discrepancy: {discrepancy:E8}", nameof(ComplexLocalOptimalScheme), i, discrepancy);
         Console.WriteLine($"[{nameof(ComplexLocalOptimalScheme)}:{i}] Discrepancy: {discrepancy:E8}");
-
+        
         return _equation.Solution;
     }
 }

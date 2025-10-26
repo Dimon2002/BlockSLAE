@@ -6,23 +6,34 @@ using BlockSLAE.Smoothing;
 using BlockSLAE.Solvers;
 using Microsoft.Extensions.Logging;
 
-const string basePath = @"E:\Projects\BlockSLAE\Input\";
+const string basePath = @"F:\projects\BlockSLAU\";
+const string input = @"Input\";
 const int slaeNumber = 1;
 
-var pathCombined = Path.Combine(basePath, slaeNumber.ToString());
+var pathCombined = Path.Combine(basePath, input, slaeNumber.ToString());
 
-var equation = ComplexEquationBuilder.BuildEquation(pathCombined, new BinaryFileHelper());
-var config = ComplexEquationBuilder.ReadSLAEConfig(pathCombined);
+var equation = SLAEReader.BuildEquation(pathCombined, new BinaryFileHelper());
+var config = SLAEReader.ReadSLAEConfig(pathCombined);
 
 var logger = LoggerFactory.Create(builder =>
 {
     builder
-        .AddConsole()
+        //.AddConsole()
+        .AddFile<BasicFormatter>(
+            configuration =>
+            {
+                configuration.Directory = basePath;
+                configuration.FileNamePrefix = $"slae_{slaeNumber}";
+            },
+            formatter =>
+            {
+                formatter.IncludePID = false;
+                formatter.IncludeUser = false;
+                formatter.CaptureScopes = false;
+            })
         .SetMinimumLevel(LogLevel.Information);
-}).CreateLogger<COCGSolver>();
+}).CreateLogger<ComplexLocalOptimalScheme>();
 
-ISmoothingStrategy strategy = new ResidualSmoothing();
-
-var solver = new COCGSolver(new ComplexDiagonalPreconditionerFactory(), strategy, logger, config);
+var solver = new ComplexLocalOptimalScheme(new ComplexDiagonalPreconditionerFactory(), new ResidualSmoothing(), logger, config);
 
 _ = solver.Solve(equation);

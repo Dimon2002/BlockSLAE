@@ -5,22 +5,23 @@ namespace BlockSLAE.Smoothing;
 
 public class ResidualSmoothing : ISmoothingStrategy
 {
-    private ComplexVector _y = ComplexVector.None;
-    private ComplexVector _s = ComplexVector.None;
+    public ComplexVector Solution { get; private set; } = ComplexVector.None;
+
+    public ComplexVector Residual { get; private set; } = ComplexVector.None;
 
     public void Initialize(ComplexVector startSolution, ComplexVector startResidual)
     {
-        _y = startSolution.Clone();
-        _s = startResidual.Clone();
+        Solution = startSolution.Clone();
+        Residual = startResidual.Clone();
     }
 
-    public void Apply(ComplexVector currentSolution, ComplexVector currentResidual, BlockMatrix matrix)
+    public void Apply(ComplexVector currentSolution, ComplexVector currentResidual)
     {
         var buffer = ComplexVector.Create(currentResidual.Length);
-        currentResidual.Subtract(_s, buffer);
+        currentResidual.Subtract(Residual, buffer);
 
-        var numerator = _s.PseudoScalarProduct(buffer).Real;
-        var denominator = buffer.PseudoScalarProduct(buffer).Real;
+        var numerator = Residual.ScalarProduct(buffer).Real;
+        var denominator = buffer.ScalarProduct(buffer).Real;
         var etta = -numerator / denominator;
 
         etta = etta switch
@@ -33,14 +34,10 @@ public class ResidualSmoothing : ISmoothingStrategy
         var complexOneMinusEtta = new Complex(1 - etta, 0);
         var complexEtta = new Complex(etta, 0);
 
-        _y.MultiplyOn(complexOneMinusEtta, _y);
-        _y.Add(currentSolution.MultiplyOn(complexEtta, buffer), _y);
+        Solution.MultiplyOn(complexOneMinusEtta, Solution);
+        Solution.Add(currentSolution.MultiplyOn(complexEtta, buffer), Solution);
 
-        _s.MultiplyOn(complexOneMinusEtta, _s);
-        _s.Add(currentResidual.MultiplyOn(complexEtta, buffer), _s);
+        Residual.MultiplyOn(complexOneMinusEtta, Residual);
+        Residual.Add(currentResidual.MultiplyOn(complexEtta, buffer), Residual);
     }
-
-    public ComplexVector SmoothingSolution => _y;
-
-    public ComplexVector SmoothingResidual => _s;
 }
