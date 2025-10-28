@@ -36,12 +36,12 @@ public class BlockMatrix
         ColumnIndex = jg.ToArray();
     }
 
-    public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
+    public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null, int degreeOfParallelism = 1)
     {
         resultMemory ??= ComplexVector.Create(vector.Length);
         resultMemory.Nullify();
 
-        return BlockMatrixMultiply(vector, resultMemory);
+        return BlockMatrixMultiply(vector, resultMemory, degreeOfParallelism);
     }
 
     public BlockMatrix Clone()
@@ -49,38 +49,52 @@ public class BlockMatrix
         return new BlockMatrix(Diagonal, Values, DiagonalIndexes, OffDiagonalIndexes, RowIndex, ColumnIndex);
     }
 
-    private ComplexVector BlockMatrixMultiply(ComplexVector vector, ComplexVector resultMemory)
+    private ComplexVector BlockMatrixMultiply(ComplexVector vector, ComplexVector resultMemory, int degreeOfParallelism)
     {
         if (Size == -1)
         {
             return ComplexVector.None;
         }
 
-        var systemSize = vector.Length / 2;
-
-        var x = vector.Values;
+        var x = vector.Clone().Values;
         var y = resultMemory.Values;
 
-        for (var i = 0; i < systemSize; ++i)
+        var vectorLength = y.Length;
+        var parallelOptions = new ParallelOptions
         {
+            MaxDegreeOfParallelism = degreeOfParallelism
+        };
+
+        var threadLocalResults = new ThreadLocal<double[]>(() => new double[vectorLength], trackAllValues: true);
+
+        Parallel.For(0, Size, parallelOptions, i =>
+        {
+            var yLocal = threadLocalResults.Value;
             var diagBlock = GetBlockData(i, i);
             var xBlock = x.AsSpan(i * 2, 2);
-            var yBlock = y.AsSpan(i * 2, 2);
+            var yBlock = yLocal.AsSpan(i * 2, 2);
 
             BlockMultiply(diagBlock, xBlock, yBlock);
 
             for (var j = RowIndex[i]; j < RowIndex[i + 1]; ++j)
             {
                 var k = ColumnIndex[j];
-
                 var offDiagBlock = GetBlockData(i, j);
                 var xk = x.AsSpan(k * 2, 2);
-                var yk = y.AsSpan(k * 2, 2);
+                var yk = yLocal.AsSpan(k * 2, 2);
 
                 BlockMultiply(offDiagBlock, xk, yBlock);
                 BlockMultiply(offDiagBlock, xBlock, yk);
             }
+        });
+
+        foreach (var local in threadLocalResults.Values)
+        {
+            for (var idx = 0; idx < vectorLength; idx++)
+                y[idx] += local[idx];
         }
+
+        threadLocalResults.Dispose();
 
         return resultMemory;
     }

@@ -11,6 +11,8 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
     private readonly ISmoothingStrategy _smoothingStrategy;
 
+    private int _degreeOfParallelism = 1;
+    
     private ComplexDiagonalPreconditioner _preconditioner = null!;
     private ComplexEquation _equation = null!;
 
@@ -41,6 +43,12 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
 
         return IterationProcess();
     }
+    
+    public ISLAESolver SetDegreeOfParallelism(int degreeOfParallelism)
+    {
+        _degreeOfParallelism = degreeOfParallelism;
+        return this;
+    }
 
     private void InitializeStartValues(ComplexEquation equation)
     {
@@ -56,8 +64,8 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
         _zNext = ComplexVector.Create(dimension);
         _pNext = ComplexVector.Create(dimension);
 
-        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(_equation.Solution), _r);
-        _preconditioner.MultiplyOn(_r, _z);
+        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(_equation.Solution, degreeOfParallelism: _degreeOfParallelism), _r);
+        _preconditioner.MultiplyOn(_r, _z, _degreeOfParallelism);
         _p = _z.Clone();
 
         _r0Norm = _r.Norm;
@@ -79,13 +87,13 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
         var i = 1;
         for (; i < Config.MaxIterations && _r.Norm / fNorm >= Config.Epsilon; i++)
         {
-            _equation.Matrix.MultiplyOn(_p, matrixByP);
+            _equation.Matrix.MultiplyOn(_p, matrixByP, _degreeOfParallelism);
 
             var a = _r.PseudoScalarProduct(_z) / matrixByP.PseudoScalarProduct(_p);
             solution.Add(_p.MultiplyOn(a, buffer), solution);
 
             _r.Subtract(matrixByP.MultiplyOn(a, buffer), _rNext);
-            _preconditioner.MultiplyOn(_rNext, _zNext);
+            _preconditioner.MultiplyOn(_rNext, _zNext, _degreeOfParallelism);
 
             var b = _rNext.PseudoScalarProduct(_zNext) / _r.PseudoScalarProduct(_z);
             _zNext.Add(_p.MultiplyOn(b, buffer), _pNext);
@@ -116,7 +124,7 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
             }
         }
 
-        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer), buffer);
+        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer, _degreeOfParallelism), buffer);
         var discrepancy = buffer.Norm / _r0Norm;
 
         Logger.LogInformation("{Solver} finished. End Iteration {i} Discrepancy: {discrepancy:E8}", nameof(COCGSolver),
