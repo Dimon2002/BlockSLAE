@@ -52,21 +52,26 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
     private void InitializeStartValues(ComplexEquation equation)
     {
         _preconditioner = _preconditionerFactory.CreatePreconditioner(equation.Matrix);
+        _preconditioner.SetDegreeOfParallelism(_degreeOfParallelism);
+        
         _equation = equation;
+        _equation.Matrix.SetDegreeOfParallelism(_degreeOfParallelism);
+        _equation.RightSide.SetDegreeOfParallelism(_degreeOfParallelism);
+        _equation.Solution.SetDegreeOfParallelism(_degreeOfParallelism);
 
         var dimension = _equation.RightSide.Length;
-        _r = ComplexVector.Create(dimension);
-        _s = ComplexVector.Create(dimension);
-        _a = ComplexVector.Create(dimension);
-        _w = ComplexVector.Create(dimension);
+        _r = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _s = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _a = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _w = ComplexVector.Create(dimension, _degreeOfParallelism);
 
         _equation.RightSide.Subtract(
-            _equation.Matrix.MultiplyOn(_equation.Solution, degreeOfParallelism: _degreeOfParallelism), _r);
-        _preconditioner.MultiplyOn(_r, _s, _degreeOfParallelism);
+            _equation.Matrix.MultiplyOn(_equation.Solution), _r);
+        _preconditioner.MultiplyOn(_r, _s);
         _p = _s.Clone();
-        _equation.Matrix.MultiplyOn(_p, _a, _degreeOfParallelism);
+        _equation.Matrix.MultiplyOn(_p, _a);
         _z = _a.Clone();
-        _preconditioner.MultiplyOn(_z, _w, _degreeOfParallelism);
+        _preconditioner.MultiplyOn(_z, _w);
 
         _r0Norm = _r.Norm;
 
@@ -78,7 +83,7 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
         var solution = _equation.Solution;
         var fNorm = _equation.RightSide.Norm;
 
-        var buffer = ComplexVector.Create(_equation.RightSide.Length);
+        var buffer = ComplexVector.Create(_equation.RightSide.Length, _degreeOfParallelism);
 
         Logger.LogInformation("{SolverName} started...\n\t\t\t\t\tOriginal \t  | \tSmoothed",
             nameof(ComplexLocalOptimalScheme));
@@ -92,14 +97,14 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
 
             _r.Subtract(_z.MultiplyOn(alpha, buffer), _r);
             _s.Subtract(_w.MultiplyOn(alpha, buffer), _s);
-            _equation.Matrix.MultiplyOn(_s, _a, _degreeOfParallelism);
+            _equation.Matrix.MultiplyOn(_s, _a);
 
             var betta = -_w.PseudoScalarProduct(_a) / _w.PseudoScalarProduct(_z);
 
             _s.Add(_p.MultiplyOn(betta, buffer), _p);
             _a.Add(_z.MultiplyOn(betta, buffer), _z);
 
-            _preconditioner.MultiplyOn(_z, _w, _degreeOfParallelism);
+            _preconditioner.MultiplyOn(_z, _w);
 
             _smoothingStrategy.Apply(solution, _r);
             if (_smoothingStrategy.Residual.Norm / fNorm < Config.Epsilon)
@@ -123,7 +128,7 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
             }
         }
 
-        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer, _degreeOfParallelism), buffer);
+        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer), buffer);
         var discrepancy = buffer.Norm / _r0Norm;
 
         Logger.LogInformation("{Solver} finished. End Iteration {i} Discrepancy: {discrepancy:E8}",

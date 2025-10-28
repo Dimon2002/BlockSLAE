@@ -20,12 +20,17 @@ public class ComplexDiagonalPreconditioner
         );
     }
 
-    public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null,
-        int degreeOfParallelism = 1)
+    public ComplexDiagonalPreconditioner SetDegreeOfParallelism(int degreeOfParallelism)
+    {
+        _decomposedMatrix.SetDegreeOfParallelism(degreeOfParallelism);
+        return this;
+    }
+    
+    public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
     {
         resultMemory ??= ComplexVector.Create(vector.Length);
 
-        return _decomposedMatrix.MultiplyOn(vector, resultMemory, degreeOfParallelism);
+        return _decomposedMatrix.MultiplyOn(vector, resultMemory);
     }
 
     private static ComplexVector EvaluateInverseDiagonal(BlockMatrix matrix)

@@ -20,13 +20,16 @@ public class BlockMatrix
 
     public static BlockMatrix None => new BlockMatrix([], [], [], [], [], []);
 
+    private int _degreeOfParallelism;
+    
     public BlockMatrix(
         IEnumerable<double> di,
         IEnumerable<double> gg,
         IEnumerable<int> idi,
         IEnumerable<int> ijg,
         IEnumerable<int> ig,
-        IEnumerable<int> jg)
+        IEnumerable<int> jg,
+        int degreeOfParallelism = 1)
     {
         Diagonal = di.ToArray();
         Values = gg.ToArray();
@@ -34,22 +37,30 @@ public class BlockMatrix
         OffDiagonalIndexes = ijg.ToArray();
         RowIndex = ig.ToArray();
         ColumnIndex = jg.ToArray();
+        
+        _degreeOfParallelism = degreeOfParallelism;
     }
 
-    public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null, int degreeOfParallelism = 1)
+    public BlockMatrix SetDegreeOfParallelism(int degreeOfParallelism)
+    {
+        _degreeOfParallelism =  degreeOfParallelism;
+        return this;
+    }
+    
+    public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
     {
         resultMemory ??= ComplexVector.Create(vector.Length);
         resultMemory.Nullify();
 
-        return BlockMatrixMultiply(vector, resultMemory, degreeOfParallelism);
+        return BlockMatrixMultiply(vector, resultMemory);
     }
 
     public BlockMatrix Clone()
     {
-        return new BlockMatrix(Diagonal, Values, DiagonalIndexes, OffDiagonalIndexes, RowIndex, ColumnIndex);
+        return new BlockMatrix(Diagonal, Values, DiagonalIndexes, OffDiagonalIndexes, RowIndex, ColumnIndex, _degreeOfParallelism);
     }
 
-    private ComplexVector BlockMatrixMultiply(ComplexVector vector, ComplexVector resultMemory, int degreeOfParallelism)
+    private ComplexVector BlockMatrixMultiply(ComplexVector vector, ComplexVector resultMemory)
     {
         if (Size == -1)
         {
@@ -62,7 +73,7 @@ public class BlockMatrix
         var vectorLength = y.Length;
         var parallelOptions = new ParallelOptions
         {
-            MaxDegreeOfParallelism = degreeOfParallelism
+            MaxDegreeOfParallelism = _degreeOfParallelism
         };
 
         var threadLocalResults = new ThreadLocal<double[]>(() => new double[vectorLength], trackAllValues: true);
