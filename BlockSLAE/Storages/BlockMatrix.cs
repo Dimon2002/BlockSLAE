@@ -21,7 +21,7 @@ public class BlockMatrix
     public static BlockMatrix None => new BlockMatrix([], [], [], [], [], []);
 
     private int _degreeOfParallelism;
-    
+
     public BlockMatrix(
         IEnumerable<double> di,
         IEnumerable<double> gg,
@@ -37,16 +37,16 @@ public class BlockMatrix
         OffDiagonalIndexes = ijg.ToArray();
         RowIndex = ig.ToArray();
         ColumnIndex = jg.ToArray();
-        
+
         _degreeOfParallelism = degreeOfParallelism;
     }
 
     public BlockMatrix SetDegreeOfParallelism(int degreeOfParallelism)
     {
-        _degreeOfParallelism =  degreeOfParallelism;
+        _degreeOfParallelism = degreeOfParallelism;
         return this;
     }
-    
+
     public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
     {
         resultMemory ??= ComplexVector.Create(vector.Length);
@@ -57,7 +57,8 @@ public class BlockMatrix
 
     public BlockMatrix Clone()
     {
-        return new BlockMatrix(Diagonal, Values, DiagonalIndexes, OffDiagonalIndexes, RowIndex, ColumnIndex, _degreeOfParallelism);
+        return new BlockMatrix(Diagonal, Values, DiagonalIndexes, OffDiagonalIndexes, RowIndex, ColumnIndex,
+            _degreeOfParallelism);
     }
 
     private ComplexVector BlockMatrixMultiply(ComplexVector vector, ComplexVector resultMemory)
@@ -67,7 +68,7 @@ public class BlockMatrix
             return ComplexVector.None;
         }
 
-        var x = vector.Clone().Values;
+        var x = vector.Values;
         var y = resultMemory.Values;
 
         var vectorLength = y.Length;
@@ -77,12 +78,20 @@ public class BlockMatrix
         };
 
         var threadLocalResults = new ThreadLocal<double[]>(() => new double[vectorLength], trackAllValues: true);
+        var threadLocalX = new ThreadLocal<double[]>(() =>
+        {
+            var localCopy = new double[x.Length];
+            Array.Copy(x, localCopy, x.Length);
+            return localCopy;
+        }, trackAllValues: false);
 
         Parallel.For(0, Size, parallelOptions, i =>
         {
+            var xLocal = threadLocalX.Value;
             var yLocal = threadLocalResults.Value;
+            
             var diagBlock = GetBlockData(i, i);
-            var xBlock = x.AsSpan(i * 2, 2);
+            var xBlock = xLocal.AsSpan(i * 2, 2);
             var yBlock = yLocal.AsSpan(i * 2, 2);
 
             BlockMultiply(diagBlock, xBlock, yBlock);
@@ -91,7 +100,7 @@ public class BlockMatrix
             {
                 var k = ColumnIndex[j];
                 var offDiagBlock = GetBlockData(i, j);
-                var xk = x.AsSpan(k * 2, 2);
+                var xk = xLocal.AsSpan(k * 2, 2);
                 var yk = yLocal.AsSpan(k * 2, 2);
 
                 BlockMultiply(offDiagBlock, xk, yBlock);
@@ -106,6 +115,7 @@ public class BlockMatrix
         }
 
         threadLocalResults.Dispose();
+        threadLocalX.Dispose();
 
         return resultMemory;
     }
