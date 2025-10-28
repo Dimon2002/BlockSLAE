@@ -11,6 +11,8 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
     private readonly ISmoothingStrategy _smoothingStrategy;
 
+    private int _degreeOfParallelism = 1;
+    
     private ComplexDiagonalPreconditioner _preconditioner = null!;
     private ComplexEquation _equation = null!;
 
@@ -41,20 +43,31 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
 
         return IterationProcess();
     }
+    
+    public ISLAESolver SetDegreeOfParallelism(int degreeOfParallelism)
+    {
+        _degreeOfParallelism = degreeOfParallelism;
+        return this;
+    }
 
     private void InitializeStartValues(ComplexEquation equation)
     {
         _preconditioner = _preconditionerFactory.CreatePreconditioner(equation.Matrix);
+        _preconditioner.SetDegreeOfParallelism(_degreeOfParallelism);
+        
         _equation = equation;
-
+        _equation.Matrix.SetDegreeOfParallelism(_degreeOfParallelism);
+        _equation.RightSide.SetDegreeOfParallelism(_degreeOfParallelism);
+        _equation.Solution.SetDegreeOfParallelism(_degreeOfParallelism);
+        
         var dimension = _equation.RightSide.Length;
 
-        _r = ComplexVector.Create(dimension);
-        _z = ComplexVector.Create(dimension);
+        _r = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _z = ComplexVector.Create(dimension, _degreeOfParallelism);
 
-        _rNext = ComplexVector.Create(dimension);
-        _zNext = ComplexVector.Create(dimension);
-        _pNext = ComplexVector.Create(dimension);
+        _rNext = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _zNext = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _pNext = ComplexVector.Create(dimension, _degreeOfParallelism);
 
         _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(_equation.Solution), _r);
         _preconditioner.MultiplyOn(_r, _z);
@@ -70,8 +83,8 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
         var solution = _equation.Solution;
         var fNorm = _equation.RightSide.Norm;
 
-        var matrixByP = ComplexVector.Create(_equation.RightSide.Length);
-        var buffer = ComplexVector.Create(_equation.RightSide.Length);
+        var matrixByP = ComplexVector.Create(_equation.RightSide.Length, _degreeOfParallelism);
+        var buffer = ComplexVector.Create(_equation.RightSide.Length, _degreeOfParallelism);
 
         Logger.LogInformation("{SolverName} started...\n\t\t\t\t\tOriginal  \t  |   \tSmoothed", nameof(COCGSolver));
         Console.WriteLine($"{nameof(COCGSolver)} started...\n\t\t\tOriginal       |   \tSmoothed");

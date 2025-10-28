@@ -11,6 +11,8 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
     private readonly ISmoothingStrategy _smoothingStrategy;
 
+    private int _degreeOfParallelism = 1;
+
     private ComplexDiagonalPreconditioner _preconditioner = null!;
     private ComplexEquation _equation = null!;
 
@@ -41,18 +43,30 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
         return IterationProcess();
     }
 
+    public ISLAESolver SetDegreeOfParallelism(int degreeOfParallelism)
+    {
+        _degreeOfParallelism = degreeOfParallelism;
+        return this;
+    }
+
     private void InitializeStartValues(ComplexEquation equation)
     {
         _preconditioner = _preconditionerFactory.CreatePreconditioner(equation.Matrix);
+        _preconditioner.SetDegreeOfParallelism(_degreeOfParallelism);
+        
         _equation = equation;
+        _equation.Matrix.SetDegreeOfParallelism(_degreeOfParallelism);
+        _equation.RightSide.SetDegreeOfParallelism(_degreeOfParallelism);
+        _equation.Solution.SetDegreeOfParallelism(_degreeOfParallelism);
 
         var dimension = _equation.RightSide.Length;
-        _r = ComplexVector.Create(dimension);
-        _s = ComplexVector.Create(dimension);
-        _a = ComplexVector.Create(dimension);
-        _w = ComplexVector.Create(dimension);
+        _r = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _s = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _a = ComplexVector.Create(dimension, _degreeOfParallelism);
+        _w = ComplexVector.Create(dimension, _degreeOfParallelism);
 
-        _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(_equation.Solution), _r);
+        _equation.RightSide.Subtract(
+            _equation.Matrix.MultiplyOn(_equation.Solution), _r);
         _preconditioner.MultiplyOn(_r, _s);
         _p = _s.Clone();
         _equation.Matrix.MultiplyOn(_p, _a);
@@ -69,11 +83,12 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
         var solution = _equation.Solution;
         var fNorm = _equation.RightSide.Norm;
 
-        var buffer = ComplexVector.Create(_equation.RightSide.Length);
+        var buffer = ComplexVector.Create(_equation.RightSide.Length, _degreeOfParallelism);
 
-        Logger.LogInformation("{SolverName} started...\n\t\t\t\t\tOriginal \t  | \tSmoothed", nameof(ComplexLocalOptimalScheme));
+        Logger.LogInformation("{SolverName} started...\n\t\t\t\t\tOriginal \t  | \tSmoothed",
+            nameof(ComplexLocalOptimalScheme));
         Console.WriteLine($"{nameof(ComplexLocalOptimalScheme)} started...\n\t\t\t\t\tOriginal      | \t\tSmoothed");
-        
+
         var i = 1;
         for (; i < Config.MaxIterations && _r.Norm / fNorm >= Config.Epsilon; i++)
         {
@@ -99,12 +114,12 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
 
                 break;
             }
-            
+
             if (i % 50 == 0)
             {
                 var relativeNorm = _r.Norm / fNorm;
                 var smoothedRelativeNorm = _smoothingStrategy.Residual.Norm / fNorm;
-                
+
                 Logger.LogInformation(
                     "[{Iteration}]  {original:E15} | {smoothed:E15} / {Discrepancy:E15}",
                     i, relativeNorm, smoothedRelativeNorm, Config.Epsilon);
@@ -116,9 +131,10 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
         _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer), buffer);
         var discrepancy = buffer.Norm / _r0Norm;
 
-        Logger.LogInformation("{Solver} finished. End Iteration {i} Discrepancy: {discrepancy:E8}", nameof(ComplexLocalOptimalScheme), i, discrepancy);
+        Logger.LogInformation("{Solver} finished. End Iteration {i} Discrepancy: {discrepancy:E8}",
+            nameof(ComplexLocalOptimalScheme), i, discrepancy);
         Console.WriteLine($"[{nameof(ComplexLocalOptimalScheme)}:{i}] Discrepancy: {discrepancy:E8}");
-        
+
         return _equation.Solution;
     }
 }

@@ -8,28 +8,31 @@ public class ComplexVector : IEnumerable<double>
     public double[] Values { get; }
     public int Length => Values.Length;
 
-    public double Norm => double.Sqrt(ScalarProduct(this, this).Real);
-    
-    public ComplexVector(IEnumerable<double> values)
+    public double Norm => double.Sqrt(ScalarProduct(this, this, _degreeOfParallelism).Real);
+
+    private int _degreeOfParallelism;
+
+    public ComplexVector(IEnumerable<double> values, int degreeOfParallelism = 1)
     {
         Values = values.ToArray();
+        _degreeOfParallelism = degreeOfParallelism;
     }
 
-    public static ComplexVector Create(int length)
+    public static ComplexVector Create(int length, int degreeOfParallelism = 1)
     {
-        return new ComplexVector(new double[length]);
+        return new ComplexVector(new double[length], degreeOfParallelism);
     }
 
-    public static ComplexVector Create(IEnumerable<double> values)
+    public static ComplexVector Create(IEnumerable<double> values, int degreeOfParallelism = 1)
     {
-        return new ComplexVector(values);
+        return new ComplexVector(values, degreeOfParallelism);
     }
 
     public static ComplexVector None => new([]);
 
     public ComplexVector Clone()
     {
-        return new ComplexVector(Values);
+        return new ComplexVector(Values, _degreeOfParallelism);
     }
 
     public void CopyFrom(ComplexVector other)
@@ -38,7 +41,7 @@ public class ComplexVector : IEnumerable<double>
         {
             throw new ArgumentException("Vectors must have the same length");
         }
-       
+
         Array.Copy(other.Values, Values, Length);
     }
 
@@ -47,50 +50,69 @@ public class ComplexVector : IEnumerable<double>
         Array.Clear(Values);
     }
 
+    public ComplexVector SetDegreeOfParallelism(int degreeOfParallelism)
+    {
+        _degreeOfParallelism = degreeOfParallelism;
+        return this;
+    }
+    
     public ComplexVector MultiplyOn(Complex complexScalar, ComplexVector? resultMemory = null)
     {
         resultMemory ??= Clone();
 
-        for (var i = 0; i < Length / 2; i++)
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = _degreeOfParallelism
+        };
+
+        Parallel.For(0, Length / 2, parallelOptions, i =>
         {
             var z = new Complex(Values[i * 2], Values[i * 2 + 1]);
             var aByZ = complexScalar * z;
-
+            
             resultMemory.Values[i * 2] = aByZ.Real;
             resultMemory.Values[i * 2 + 1] = aByZ.Imaginary;
-        }
+        });
 
         return resultMemory;
     }
 
     public Complex ScalarProduct(ComplexVector outerVector)
     {
-        return ScalarProduct(this, outerVector);
+        return ScalarProduct(this, outerVector, _degreeOfParallelism);
     }
 
     public Complex PseudoScalarProduct(ComplexVector outerVector)
     {
-        return PseudoScalarProduct(this, outerVector);
+        return PseudoScalarProduct(this, outerVector, _degreeOfParallelism);
     }
 
-    public void Add(ComplexVector other, ComplexVector? resultMemory = null)
+    public void Add(ComplexVector right, ComplexVector? resultMemory = null)
     {
-        LinearCombination(1, 1, other, resultMemory ?? Create(other.Length));
+        LinearCombination(1, 1, this, right, resultMemory ?? Create(right.Length));
     }
 
-    public void Subtract(ComplexVector other, ComplexVector? resultMemory = null)
+    public void Subtract(ComplexVector right, ComplexVector? resultMemory = null)
     {
-        LinearCombination(1, -1, other, resultMemory ?? Create(other.Length));
+        LinearCombination(1, -1, this, right, resultMemory ?? Create(right.Length));
     }
 
-    private void LinearCombination(int a, int b, ComplexVector other, ComplexVector resultMemory)
+    private void LinearCombination(int a, int b, ComplexVector left, ComplexVector right, ComplexVector resultMemory)
     {
-        for (var i = 0; i < Length; i++)
+        if (left.Length != right.Length)
         {
-            resultMemory.Values[i] = a * Values[i] + b * other.Values[i];
+            throw new ArgumentException("Vectors must have the same length");
         }
+
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = _degreeOfParallelism
+        };
+
+        Parallel.For(0, Length, parallelOptions,
+            i => resultMemory.Values[i] = a * left.Values[i] + b * right.Values[i]);
     }
-    
+
     private static ComplexVector Conjugate(ComplexVector vector)
     {
         var conjugatedVector = vector.Clone();
@@ -103,7 +125,7 @@ public class ComplexVector : IEnumerable<double>
         return new ComplexVector(conjugatedVector);
     }
 
-    private static Complex ScalarProduct(ComplexVector a, ComplexVector b) // 2
+    private static Complex ScalarProduct(ComplexVector a, ComplexVector b, int degreeOfParallelism) // 2
     {
         if (a.Length % 2 != 0 || b.Length % 2 != 0)
         {
@@ -115,21 +137,26 @@ public class ComplexVector : IEnumerable<double>
             throw new ArgumentException("Vector and result must have same length");
         }
 
-        Complex sum = 0;
-        for (var i = 0; i < a.Length / 2; ++i)
+        var size = a.Length / 2;
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = degreeOfParallelism
+        };
+        var threadLocalResults = new ThreadLocal<Complex>(() => Complex.Zero, trackAllValues: true);
+
+        Parallel.For(0, size, parallelOptions, i =>
         {
             var aComplex = new Complex(a.Values[2 * i], -a.Values[2 * i + 1]);
             var bComplex = new Complex(b.Values[2 * i], b.Values[2 * i + 1]);
+            threadLocalResults.Value += aComplex * bComplex;
+        });
 
-            sum += aComplex * bComplex;
-        }
-
-        return sum;
+        return threadLocalResults.Values.Aggregate<Complex, Complex>(0, (current, local) => current + local);
     }
 
-    private static Complex PseudoScalarProduct(ComplexVector a, ComplexVector b) // 3
+    private static Complex PseudoScalarProduct(ComplexVector a, ComplexVector b, int degreeOfParallelism) // 3
     {
-        return ScalarProduct(Conjugate(a), b);
+        return ScalarProduct(Conjugate(a), b, degreeOfParallelism);
     }
 
     public IEnumerator<double> GetEnumerator() => ((IEnumerable<double>)Values).GetEnumerator();

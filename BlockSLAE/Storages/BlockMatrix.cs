@@ -20,13 +20,16 @@ public class BlockMatrix
 
     public static BlockMatrix None => new BlockMatrix([], [], [], [], [], []);
 
+    private int _degreeOfParallelism;
+
     public BlockMatrix(
         IEnumerable<double> di,
         IEnumerable<double> gg,
         IEnumerable<int> idi,
         IEnumerable<int> ijg,
         IEnumerable<int> ig,
-        IEnumerable<int> jg)
+        IEnumerable<int> jg,
+        int degreeOfParallelism = 1)
     {
         Diagonal = di.ToArray();
         Values = gg.ToArray();
@@ -34,6 +37,14 @@ public class BlockMatrix
         OffDiagonalIndexes = ijg.ToArray();
         RowIndex = ig.ToArray();
         ColumnIndex = jg.ToArray();
+
+        _degreeOfParallelism = degreeOfParallelism;
+    }
+
+    public BlockMatrix SetDegreeOfParallelism(int degreeOfParallelism)
+    {
+        _degreeOfParallelism = degreeOfParallelism;
+        return this;
     }
 
     public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
@@ -46,7 +57,8 @@ public class BlockMatrix
 
     public BlockMatrix Clone()
     {
-        return new BlockMatrix(Diagonal, Values, DiagonalIndexes, OffDiagonalIndexes, RowIndex, ColumnIndex);
+        return new BlockMatrix(Diagonal, Values, DiagonalIndexes, OffDiagonalIndexes, RowIndex, ColumnIndex,
+            _degreeOfParallelism);
     }
 
     private ComplexVector BlockMatrixMultiply(ComplexVector vector, ComplexVector resultMemory)
@@ -56,31 +68,54 @@ public class BlockMatrix
             return ComplexVector.None;
         }
 
-        var systemSize = vector.Length / 2;
-
         var x = vector.Values;
         var y = resultMemory.Values;
 
-        for (var i = 0; i < systemSize; ++i)
+        var vectorLength = y.Length;
+        var parallelOptions = new ParallelOptions
         {
+            MaxDegreeOfParallelism = _degreeOfParallelism
+        };
+
+        var threadLocalResults = new ThreadLocal<double[]>(() => new double[vectorLength], trackAllValues: true);
+        var threadLocalX = new ThreadLocal<double[]>(() =>
+        {
+            var localCopy = new double[x.Length];
+            Array.Copy(x, localCopy, x.Length);
+            return localCopy;
+        }, trackAllValues: false);
+
+        Parallel.For(0, Size, parallelOptions, i =>
+        {
+            var xLocal = threadLocalX.Value;
+            var yLocal = threadLocalResults.Value;
+            
             var diagBlock = GetBlockData(i, i);
-            var xBlock = x.AsSpan(i * 2, 2);
-            var yBlock = y.AsSpan(i * 2, 2);
+            var xBlock = xLocal.AsSpan(i * 2, 2);
+            var yBlock = yLocal.AsSpan(i * 2, 2);
 
             BlockMultiply(diagBlock, xBlock, yBlock);
 
             for (var j = RowIndex[i]; j < RowIndex[i + 1]; ++j)
             {
                 var k = ColumnIndex[j];
-
                 var offDiagBlock = GetBlockData(i, j);
-                var xk = x.AsSpan(k * 2, 2);
-                var yk = y.AsSpan(k * 2, 2);
+                var xk = xLocal.AsSpan(k * 2, 2);
+                var yk = yLocal.AsSpan(k * 2, 2);
 
                 BlockMultiply(offDiagBlock, xk, yBlock);
                 BlockMultiply(offDiagBlock, xBlock, yk);
             }
+        });
+
+        foreach (var local in threadLocalResults.Values)
+        {
+            for (var idx = 0; idx < vectorLength; idx++)
+                y[idx] += local[idx];
         }
+
+        threadLocalResults.Dispose();
+        threadLocalX.Dispose();
 
         return resultMemory;
     }

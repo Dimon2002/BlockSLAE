@@ -6,7 +6,7 @@ namespace BlockSLAE.Tests;
 
 public class ComplexDiagonalPreconditionerTest
 {
-    private ComplexDiagonalPreconditioner _preconditioner;
+    private ComplexDiagonalPreconditioner _preconditioner = null!;
 
     [SetUp]
     public void Setup()

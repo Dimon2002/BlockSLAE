@@ -20,6 +20,12 @@ public class ComplexDiagonalPreconditioner
         );
     }
 
+    public ComplexDiagonalPreconditioner SetDegreeOfParallelism(int degreeOfParallelism)
+    {
+        _decomposedMatrix.SetDegreeOfParallelism(degreeOfParallelism);
+        return this;
+    }
+    
     public ComplexVector MultiplyOn(ComplexVector vector, ComplexVector? resultMemory = null)
     {
         resultMemory ??= ComplexVector.Create(vector.Length);
