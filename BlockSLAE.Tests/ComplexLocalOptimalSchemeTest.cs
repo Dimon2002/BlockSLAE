@@ -1,4 +1,4 @@
-﻿using BlockSLAE.Preconditions;
+﻿using BlockSLAE.Factory;
 using BlockSLAE.Smoothing;
 using BlockSLAE.Solvers;
 using BlockSLAE.Storages;

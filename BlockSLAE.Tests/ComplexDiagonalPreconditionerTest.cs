@@ -1,4 +1,5 @@
-﻿using BlockSLAE.Preconditions;
+﻿using BlockSLAE.Factory;
+using BlockSLAE.Preconditions;
 using BlockSLAE.Storages;
 using NUnit.Framework;
 

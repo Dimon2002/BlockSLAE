@@ -1,11 +1,14 @@
-﻿using BlockSLAE.Preconditions;
+﻿using BlockSLAE.Factory;
+using BlockSLAE.Preconditions;
 using BlockSLAE.Smoothing;
 using BlockSLAE.Storages;
 using BlockSLAE.Storages.Structures;
+using BlockSLAE.Testing.Configs;
 using Microsoft.Extensions.Logging;
 
 namespace BlockSLAE.Solvers;
 
+[Solver("ComplexLocalOptimalScheme")]
 public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
 {
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
@@ -24,6 +27,8 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
     private ComplexVector _z;
     private ComplexVector _a;
     private ComplexVector _w;
+
+    public event Action<int, double, double>? IterationCompleted;
 
     public ComplexLocalOptimalScheme(
         ComplexDiagonalPreconditionerFactory factory,
@@ -107,18 +112,20 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
             _preconditioner.MultiplyOn(_z, _w);
 
             _smoothingStrategy.Apply(solution, _r);
+            var relativeNorm = _r.Norm / fNorm;
+            var smoothedRelativeNorm = _smoothingStrategy.Residual.Norm / fNorm;
+
+            IterationCompleted?.Invoke(i, relativeNorm, smoothedRelativeNorm);
             if (_smoothingStrategy.Residual.Norm / fNorm < Config.Epsilon)
             {
                 solution.CopyFrom(_smoothingStrategy.Solution);
-                _r.CopyFrom(_smoothingStrategy.Residual);
-
                 break;
             }
 
             if (i % 50 == 0)
             {
-                var relativeNorm = _r.Norm / fNorm;
-                var smoothedRelativeNorm = _smoothingStrategy.Residual.Norm / fNorm;
+                relativeNorm = _r.Norm / fNorm;
+                smoothedRelativeNorm = _smoothingStrategy.Residual.Norm / fNorm;
 
                 Logger.LogInformation(
                     "[{Iteration}]  {original:E15} | {smoothed:E15} / {Discrepancy:E15}",
@@ -131,6 +138,7 @@ public class ComplexLocalOptimalScheme : Method<SLAEConfig>, ISLAESolver
         _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer), buffer);
         var discrepancy = buffer.Norm / _r0Norm;
 
+        IterationCompleted?.Invoke(i, discrepancy, 0);
         Logger.LogInformation("{Solver} finished. End Iteration {i} Discrepancy: {discrepancy:E8}",
             nameof(ComplexLocalOptimalScheme), i, discrepancy);
         Console.WriteLine($"[{nameof(ComplexLocalOptimalScheme)}:{i}] Discrepancy: {discrepancy:E8}");

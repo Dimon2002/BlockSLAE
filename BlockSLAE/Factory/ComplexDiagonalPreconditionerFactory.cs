@@ -1,6 +1,7 @@
-﻿using BlockSLAE.Storages;
+﻿using BlockSLAE.Preconditions;
+using BlockSLAE.Storages;
 
-namespace BlockSLAE.Preconditions;
+namespace BlockSLAE.Factory;
 
 public class ComplexDiagonalPreconditionerFactory
 {

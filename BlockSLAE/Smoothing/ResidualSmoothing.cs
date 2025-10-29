@@ -9,19 +9,23 @@ public class ResidualSmoothing : ISmoothingStrategy
 
     public ComplexVector Residual { get; private set; } = ComplexVector.None;
 
+    private ComplexVector _buffer = ComplexVector.None;
+    
     public void Initialize(ComplexVector startSolution, ComplexVector startResidual)
     {
         Solution = startSolution.Clone();
         Residual = startResidual.Clone();
+
+        _buffer = startResidual.Clone();
+        _buffer.Nullify();
     }
 
     public void Apply(ComplexVector currentSolution, ComplexVector currentResidual)
     {
-        var buffer = ComplexVector.Create(currentResidual.Length);
-        currentResidual.Subtract(Residual, buffer);
+        currentResidual.Subtract(Residual, _buffer);
 
-        var numerator = Residual.ScalarProduct(buffer).Real;
-        var denominator = buffer.ScalarProduct(buffer).Real;
+        var numerator = Residual.ScalarProduct(_buffer).Real;
+        var denominator = _buffer.ScalarProduct(_buffer).Real;
         var etta = -numerator / denominator;
 
         etta = etta switch
@@ -35,9 +39,9 @@ public class ResidualSmoothing : ISmoothingStrategy
         var complexEtta = new Complex(etta, 0);
 
         Solution.MultiplyOn(complexOneMinusEtta, Solution);
-        Solution.Add(currentSolution.MultiplyOn(complexEtta, buffer), Solution);
+        Solution.Add(currentSolution.MultiplyOn(complexEtta, _buffer), Solution);
 
         Residual.MultiplyOn(complexOneMinusEtta, Residual);
-        Residual.Add(currentResidual.MultiplyOn(complexEtta, buffer), Residual);
+        Residual.Add(currentResidual.MultiplyOn(complexEtta, _buffer), Residual);
     }
 }

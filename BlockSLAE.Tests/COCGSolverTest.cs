@@ -1,8 +1,8 @@
-﻿using NUnit.Framework;
+﻿using BlockSLAE.Factory;
+using NUnit.Framework;
 using Microsoft.Extensions.Logging.Abstractions;
 using BlockSLAE.Storages;
 using BlockSLAE.Solvers;
-using BlockSLAE.Preconditions;
 using BlockSLAE.Smoothing;
 using BlockSLAE.Storages.Structures;
 

@@ -1,11 +1,14 @@
-﻿using BlockSLAE.Preconditions;
+﻿using BlockSLAE.Factory;
+using BlockSLAE.Preconditions;
 using BlockSLAE.Smoothing;
 using BlockSLAE.Storages;
 using BlockSLAE.Storages.Structures;
+using BlockSLAE.Testing.Configs;
 using Microsoft.Extensions.Logging;
 
 namespace BlockSLAE.Solvers;
 
+[Solver("COCG")]
 public class COCGSolver : Method<SLAEConfig>, ISLAESolver
 {
     private readonly ComplexDiagonalPreconditionerFactory _preconditionerFactory;
@@ -26,6 +29,8 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
     private ComplexVector _zNext;
     private ComplexVector _pNext;
 
+    public event Action<int, double, double>? IterationCompleted;
+    
     public COCGSolver(
         ComplexDiagonalPreconditionerFactory factory,
         ISmoothingStrategy strategy,
@@ -40,7 +45,6 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
     public ComplexVector Solve(ComplexEquation equation)
     {
         InitializeStartValues(equation);
-
         return IterationProcess();
     }
     
@@ -103,23 +107,25 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
             var b = _rNext.PseudoScalarProduct(_zNext) / _r.PseudoScalarProduct(_z);
             _zNext.Add(_p.MultiplyOn(b, buffer), _pNext);
 
-            _smoothingStrategy.Apply(solution, _rNext);
-            if (_smoothingStrategy.Residual.Norm / fNorm < Config.Epsilon)
-            {
-                solution.CopyFrom(_smoothingStrategy.Solution);
-                _rNext.CopyFrom(_smoothingStrategy.Residual);
-
-                break;
-            }
-
             (_r, _rNext) = (_rNext, _r);
             (_z, _zNext) = (_zNext, _z);
             (_p, _pNext) = (_pNext, _p);
+            
+            _smoothingStrategy.Apply(solution, _r);
+            var relativeNorm = _r.Norm / fNorm;
+            var smoothedRelativeNorm = _smoothingStrategy.Residual.Norm / fNorm;
+            
+            IterationCompleted?.Invoke(i, relativeNorm, smoothedRelativeNorm);
+            if (smoothedRelativeNorm < Config.Epsilon)
+            {
+                solution.CopyFrom(_smoothingStrategy.Solution);
+                break;
+            }
 
             if (i % 50 == 0)
             {
-                var relativeNorm = _r.Norm / fNorm;
-                var smoothedRelativeNorm = _smoothingStrategy.Residual.Norm / fNorm;
+                relativeNorm = _r.Norm / fNorm;
+                smoothedRelativeNorm = _smoothingStrategy.Residual.Norm / fNorm;
                 
                 Logger.LogInformation(
                     "[{Iteration}]  {original:E15} | {smoothed:E15} / {Discrepancy:E15}",
@@ -132,6 +138,7 @@ public class COCGSolver : Method<SLAEConfig>, ISLAESolver
         _equation.RightSide.Subtract(_equation.Matrix.MultiplyOn(solution, buffer), buffer);
         var discrepancy = buffer.Norm / _r0Norm;
 
+        IterationCompleted?.Invoke(i, discrepancy, 0);
         Logger.LogInformation("{Solver} finished. End Iteration {i} Discrepancy: {discrepancy:E8}", nameof(COCGSolver),
             i, discrepancy);
         Console.WriteLine($"[{nameof(COCGSolver)}:{i}] Discrepancy: {discrepancy:E8}");

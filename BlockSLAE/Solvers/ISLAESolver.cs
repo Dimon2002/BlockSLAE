@@ -3,7 +3,7 @@ using BlockSLAE.Storages.Structures;
 
 namespace BlockSLAE.Solvers;
 
-public interface ISLAESolver
+public interface ISLAESolver : IIterationNotifier
 {
     ComplexVector Solve(ComplexEquation  equation);
 
