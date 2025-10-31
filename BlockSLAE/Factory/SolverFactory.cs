@@ -52,15 +52,14 @@ public static class SolverFactory
                         && m.GetParameters().Length == 1)
             .MakeGenericMethod(solverType);
 
-        var typedLogger = createLoggerGeneric.Invoke(null, new object[] { loggerFactory });
+        var typedLogger = createLoggerGeneric.Invoke(null, [loggerFactory]);
 
-        var solver = (ISLAESolver)ctor.Invoke(new object[]
-        {
+        var solver = (ISLAESolver)ctor.Invoke([
             new ComplexDiagonalPreconditionerFactory(),
             smoothing,
             typedLogger!,
             config
-        });
+        ]);
 
         return solver;
     }
